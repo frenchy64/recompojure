@@ -1,17 +1,42 @@
 ;; TODO should :query-params be automatically optionalized? :query?
 (ns compojure-api-tools.core-reitit
-  "Exposes the API of compojure.api.core v1.1.13
-  
-  Always use this namespace over compojure.api.{core,sweet}
-  as it also loads the CTIA routing extensions."
-  (:require ;;TODO remove dependency
-            [compojure.api.common :as common]
-            [ctia.lib.compojure.api.core-common :refer [check-return-banned!]]
-            [clojure.set :as set]
+  "Exposes the API of compojure.api.core v1.1.13"
+  (:require [clojure.set :as set]
             [clojure.walk :as walk]
-            [ctia.http.middleware.auth :as mid]
-            [ctia.auth :as auth]
+            ;;TODO remove dependency
+            [compojure.api.common :as common]
             [schema-tools.core :as st]))
+
+;;TODO make ns extensible, use these as examples
+(defn- ident->map-stub [& args] (assert nil (str "stub " `ident->map-stub)))
+(defn- wrap-capabilities-stub [capabilities]
+  (let [check-capabilities! (fn [{:keys [identity]}]
+                              (assert nil "TODO")
+                              #_
+                              (require-capability!
+                                capabilities
+                                identity))]
+    (fn [handler]
+      (fn
+        ([request]
+         (check-capabilities! request)
+         (handler request))
+        ([request respond raise]
+         (when (try (check-capabilities! request)
+                    true
+                    (catch Throwable e
+                      (raise e)
+                      false))
+           (handler request respond raise)))))))
+
+(defn- check-return-banned! [options]
+  (when-some [[_ schema] (find options :return)]
+    (throw (ex-info (format (str ":return is banned, please use :responses instead.\n"
+                                 "In this case, :return %s is equivalent to :responses {200 {:schema %s}}.\n"
+                                 "For 204, you can use :responses {204 nil}.\n"
+                                 "For catch-all, use :responses {:default {:schema SCHEMA}}")
+                            schema schema)
+                    {}))))
 
 ;;TODO this isn't right
 (defn routes
@@ -61,9 +86,10 @@
                         tags (assoc-in [:swagger :tags] (list 'quote tags))
                         description (assoc-in [:swagger :description] description)
                         summary (assoc-in [:swagger :summary] summary)
+                        #_#_;;TODO
                         capabilities (update :middleware (fn [prev]
                                                            (assert (not prev))
-                                                           [[`(mid/wrap-capabilities ~capabilities)]]))
+                                                           [[`(wrap-capabilities-stub ~capabilities)]]))
                         responses (assoc :responses `(compojure->reitit-responses ~responses))))]
     `[~path
       ~@(some-> (not-empty reitit-opts) list)
@@ -249,7 +275,7 @@
                                   (when identity-map
                                     (assert (simple-symbol? identity-map) (str ":identity-map must be a simple symbol: "
                                                                                (pr-str identity-map)))
-                                    {:scoped [identity-map (list `auth/ident->map @gidentity)]}))
+                                    {:scoped [identity-map (list `ident->map-stub @gidentity)]}))
         _ (when (seq gs)
             (assert (apply distinct? (map first (partition 2 gs)))))
         _ (when (seq scoped)
@@ -273,8 +299,9 @@
                      middleware (update :middleware (fn [prev]
                                                       (assert (not prev))
                                                       middleware))
+                     #_#_;;TODO
                      capabilities (update :middleware (fn [prev]
-                                                        (let [this-middleware [`(mid/wrap-capabilities ~capabilities)]]
+                                                        (let [this-middleware [`(wrap-capabilities-stub ~capabilities)]]
                                                           ;; how to combine with existing :middleware? just ask the user do it.
                                                           (when prev
                                                             (throw (ex-info (format
