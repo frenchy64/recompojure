@@ -38,4 +38,5 @@
                   :exclusions [;;FIXME compojure uses v3 and reitit uses v4.
                                metosin/ring-swagger-ui
                                metosin/reitit-malli]]]
+  :codox {:source-uri "https://github.com/frenchy64/compojure-api-tools/blob/{git-commit}/{filepath}#L{line}"}
   :repl-options {:init-ns compojure-api-tools.core-reitit})
