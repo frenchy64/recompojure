@@ -6,6 +6,7 @@
   :plugins [[lein-codox "0.10.7"]
             [lein-shell "0.5.0"]
             [lein-pprint "1.3.2"]]
+  :profiles {:gen-doc {:jvm-opts ["--add-opens" "java.base/java.lang=ALL-UNNAMED"]}}
   :release-tasks [["clean"]
                   ["vcs" "assert-committed"]
                   ["change" "version" "leiningen.release/bump-version" "release"]
