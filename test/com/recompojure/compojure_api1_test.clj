@@ -1,6 +1,7 @@
 (ns com.recompojure.compojure-api1-test
   (:require [clojure.test :refer [is]]
             [com.recompojure.compojure-api1 :as sut]
+            [com.recompojure.compojure-api1.impl :as impl]
             [io.github.frenchy64.fully-satisfies.never :refer [never?]]
             [io.github.frenchy64.fully-satisfies.uncaught-testing-contexts :refer [testing deftest]]
             [reitit.coercion.schema :as rcs]
@@ -13,11 +14,11 @@
             [schema.utils :as su]))
 
 (defmacro with-deterministic-gensym [& body]
-  `(with-bindings {#'sut/*gensym* (let [a# (atom -1)]
-                                    (fn [s#]
-                                      {:pre [(string? s#)]
-                                       :post [(symbol? ~'%)]}
-                                      (symbol (str s# "__" (swap! a# inc')))))}
+  `(with-bindings {#'impl/*gensym* (let [a# (atom -1)]
+                                     (fn [s#]
+                                       {:pre [(string? s#)]
+                                        :post [(symbol? ~'%)]}
+                                       (symbol (str s# "__" (swap! a# inc')))))}
      (do ~@body)))
 
 (defn dexpand-1 [form]
@@ -200,7 +201,7 @@
 (deftest responses-test
   (testing "GET"
     (is (= '["/my-route" {:get {:handler (clojure.core/fn [req__0] (clojure.core/let [] (do {:status 200, :body 1})))
-                                :responses (com.recompojure.compojure-api1/compojure->reitit-responses {200 {:schema schema.core/Int}})}}]
+                                :responses (com.recompojure.compojure-api1.impl/compojure->reitit-responses {200 {:schema schema.core/Int}})}}]
            (dexpand-1
              `(sut/GET "/my-route" []
                        :responses {200 {:schema s/Int}}
@@ -230,7 +231,7 @@
                    (app {:request-method :get
                          :uri "/my-route"})))))
   (testing "context"
-    (is (= '["/context" {:responses (com.recompojure.compojure-api1/compojure->reitit-responses {200 {:schema schema.core/Int}})}
+    (is (= '["/context" {:responses (com.recompojure.compojure-api1.impl/compojure->reitit-responses {200 {:schema schema.core/Int}})}
              (com.recompojure.compojure-api1/routes
                (com.recompojure.compojure-api1/GET "/my-route" [] {:status 200, :body 1}))]
            (dexpand-1

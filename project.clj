@@ -7,7 +7,8 @@
             [lein-shell "0.5.0"]
             [lein-pprint "1.3.2"]]
   :profiles {:gen-doc {:jvm-opts ["--add-opens" "java.base/java.lang=ALL-UNNAMED"]}
-             :dev {:dependencies [[io.github.frenchy64/fully-satisfies "1.10.4"]]}}
+             :dev {:dependencies [[io.github.frenchy64/fully-satisfies "1.10.4"]
+                                  [metosin/ring-swagger "0.26.2"]]}}
   :release-tasks [["clean"]
                   ["vcs" "assert-committed"]
                   ["change" "version" "leiningen.release/bump-version" "release"]
