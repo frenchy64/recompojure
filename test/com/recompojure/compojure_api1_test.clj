@@ -232,8 +232,9 @@
                          :uri "/my-route"})))))
   (testing "context"
     (is (= '["/context" {:responses (com.recompojure.compojure-api1.impl/compojure->reitit-responses {200 {:schema schema.core/Int}})}
-             (com.recompojure.compojure-api1/routes
-               (com.recompojure.compojure-api1/GET "/my-route" [] {:status 200, :body 1}))]
+             (com.recompojure.compojure-api1.impl/routes
+               (quote com.recompojure.compojure-api1/options)
+               [(com.recompojure.compojure-api1/GET "/my-route" [] {:status 200, :body 1})])]
            (dexpand-1
              `(sut/context "/context" []
                            :responses {200 {:schema s/Int}}

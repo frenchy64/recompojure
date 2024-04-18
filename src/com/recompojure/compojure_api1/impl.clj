@@ -7,6 +7,23 @@
 
 (def ^:private ^:dynamic *gensym* gensym)
 
+(defn options-sym [sym-or-options]
+  {:post [(qualified-symbol? %)]}
+  (if (symbol? sym-or-options)
+    sym-or-options
+    (::options-sym sym-or-options)))
+
+(defn resolve-options [sym-or-options]
+  (if (map? sym-or-options)
+    sym-or-options
+    (let [sym sym-or-options]
+      (assert (qualified-symbol? sym))
+      (let [v (ns-resolve sym)
+            _ (assert (var? v))
+            options @sym]
+        (assert (map? options) (str "Missing options from " sym))
+        (assoc options ::options-sym sym)))))
+
 ;compojure.api.common
 (defn- plain-map?
   "checks whether input is a map, but not a record"
@@ -164,6 +181,38 @@
                  options)
   nil)
 
+(def ^:private allowed-context-options #{:tags :capabilities :description :responses :summary})
+
+(defn context
+  "Like compojure.api.core/context, except the binding vector must be empty and
+  no binding-style options are allowed. This is to prevent the passed routes
+  from being reinitialized on every request."
+  [OPTIONS path arg args]
+  (when-not (and (vector? arg)
+                 (= [] arg))
+    (throw (ex-info (str "Not allowed to bind anything in context, push into HTTP verbs instead: " (pr-str arg))
+                    {})))
+  (let [[options body-exprs] (extract-parameters args true)
+        _ (check-return-banned! options)
+        _ (when-some [extra-keys (not-empty (set/difference (set (keys options))
+                                                            allowed-context-options))]
+            (throw (ex-info (str "Not allowed these options in `context`, push into HTTP verbs instead: "
+                                 (pr-str (sort extra-keys)))
+                            {})))
+        reitit-opts (let [{:keys [tags description summary capabilities responses]} options]
+                      (cond-> {}
+                        tags (assoc-in [:swagger :tags] (list 'quote tags))
+                        description (assoc-in [:swagger :description] description)
+                        summary (assoc-in [:swagger :summary] summary)
+                        #_#_;;TODO
+                        capabilities (update :middleware (fn [prev]
+                                                           (assert (not prev))
+                                                           [[`(wrap-capabilities-stub ~capabilities)]]))
+                        responses (assoc :responses `(compojure->reitit-responses ~responses))))]
+    `[~path
+      ~@(some-> (not-empty reitit-opts) list)
+      (routes '~(options-sym OPTIONS) ~(vec body-exprs))]))
+
 (defn ^:private restructure-endpoint [http-kw [path arg & args] options]
   (assert (simple-keyword? http-kw))
   (assert (or (= [] arg)
@@ -318,13 +367,34 @@
              (= 'quote (first l)))
     (second l)))
 
+;;TODO this isn't right
+(defn routes
+  "Create a Ring handler by combining several handlers into one."
+  [options handlers]
+  (vec handlers))
+
 (defmacro load-api [options]
-  (let [options-sym (quoted options)]
-    (assert (qualified-symbol? options-sym) "Argument to load-api must be a quoted qualified symbol")
-    `(let [options# ~options-sym]
-       (defmacro ~'GET     {:style/indent 2 :arglists '([& ~'args])} [& args#] (GET options# args#))
-       (defmacro ~'ANY     {:style/indent 2 :arglists '([& ~'args])} [& args#] (ANY options# args#))
-       (defmacro ~'PATCH   {:style/indent 2 :arglists '([& ~'args])} [& args#] (PATCH options# args#))
-       (defmacro ~'DELETE  {:style/indent 2 :arglists '([& ~'args])} [& args#] (DELETE options# args#))
-       (defmacro ~'POST    {:style/indent 2 :arglists '([& ~'args])} [& args#] (POST options# args#))
-       (defmacro ~'PUT     {:style/indent 2 :arglists '([& ~'args])} [& args#] (PUT options# args#)))))
+  (assert (and (seq? options)
+               (= 2 (count options))
+               (= 'quote (first options))
+               (qualified-symbol? (second options)))
+          "Options must be a quoted qualified symbol whose var contains your configuration, like: (load-api `options)")
+  `(let [options# ~options]
+     (defmacro ~'GET     {:style/indent 2 :arglists '([& ~'args])} [& args#] (GET options# args#))
+     (defmacro ~'ANY     {:style/indent 2 :arglists '([& ~'args])} [& args#] (ANY options# args#))
+     (defmacro ~'PATCH   {:style/indent 2 :arglists '([& ~'args])} [& args#] (PATCH options# args#))
+     (defmacro ~'DELETE  {:style/indent 2 :arglists '([& ~'args])} [& args#] (DELETE options# args#))
+     (defmacro ~'POST    {:style/indent 2 :arglists '([& ~'args])} [& args#] (POST options# args#))
+     (defmacro ~'PUT     {:style/indent 2 :arglists '([& ~'args])} [& args#] (PUT options# args#))
+     (defmacro ~'context
+       "Like compojure.api.core/context, except the binding vector must be empty and
+       no binding-style options are allowed. This is to prevent the passed routes
+       from being reinitialized on every request."
+       {:style/indent 2 :arglists '~'([path arg & args])}
+       [path# arg# & args#]
+       (context options# path# arg# args#))
+     (defn ~'routes
+       "Create a Ring handler by combining several handlers into one."
+       {:style/indent 2 :arglists '~'([& handlers])}
+       [& handlers#]
+       (routes options# handlers#))))
