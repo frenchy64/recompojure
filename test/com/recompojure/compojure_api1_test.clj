@@ -105,7 +105,7 @@
              :capabilities ~'capabilities
              :middleware [[~'render-resource-file]]
              ~'routes)
-          "Combining :middleware and :capabilities not yet supported. Please use :middleware [(compojure-api-tools.core-reitit/wrap-capabilities-stub capabilities)] instead of :capabilities capabilities.\nThe complete middleware might look like: :middleware (conj [[render-resource-file]] (compojure-api-tools.core-reitit/wrap-capabilities-stub capabilities))."))
+          "Combining :middleware and :capabilities not yet supported. Please use :middleware [(com.recompojure.compojure-api1/wrap-capabilities-stub capabilities)] instead of :capabilities capabilities.\nThe complete middleware might look like: :middleware (conj [[render-resource-file]] (com.recompojure.compojure-api1/wrap-capabilities-stub capabilities))."))
       (is (= '["/my-route" {:get {:handler (clojure.core/fn [req__0] (clojure.core/let [] (do identity)))
                                   :middleware [[render-resource-file]]}}]
              (dexpand-1
@@ -149,16 +149,16 @@
            identity)))
   
   #_ ;;TODO
-  (is (= '["/my-route" {:middleware [[(compojure-api-tools.core-reitit/wrap-capabilities-stub :create-incident)]]}
-           (compojure-api-tools.core-reitit/routes clojure.core/identity)]
+  (is (= '["/my-route" {:middleware [[(com.recompojure.compojure-api1/wrap-capabilities-stub :create-incident)]]}
+           (com.recompojure.compojure-api1/routes clojure.core/identity)]
          (dexpand-1
            `(sut/context
               "/my-route" []
               :capabilities :create-incident
               identity))))
   #_ ;;TODO
-  (is (= '["/my-route" {:middleware [[(compojure-api-tools.core-reitit/wrap-capabilities-stub capabilities-are-expressions)]]}
-           (compojure-api-tools.core-reitit/routes clojure.core/identity)]
+  (is (= '["/my-route" {:middleware [[(com.recompojure.compojure-api1/wrap-capabilities-stub capabilities-are-expressions)]]}
+           (com.recompojure.compojure-api1/routes clojure.core/identity)]
          (dexpand-1
            `(sut/context
               "/my-route" []
@@ -200,7 +200,7 @@
 (deftest responses-test
   (testing "GET"
     (is (= '["/my-route" {:get {:handler (clojure.core/fn [req__0] (clojure.core/let [] (do {:status 200, :body 1})))
-                                :responses (compojure-api-tools.core-reitit/compojure->reitit-responses {200 {:schema schema.core/Int}})}}]
+                                :responses (com.recompojure.compojure-api1/compojure->reitit-responses {200 {:schema schema.core/Int}})}}]
            (dexpand-1
              `(sut/GET "/my-route" []
                        :responses {200 {:schema s/Int}}
@@ -230,9 +230,9 @@
                    (app {:request-method :get
                          :uri "/my-route"})))))
   (testing "context"
-    (is (= '["/context" {:responses (compojure-api-tools.core-reitit/compojure->reitit-responses {200 {:schema schema.core/Int}})}
-             (compojure-api-tools.core-reitit/routes
-               (compojure-api-tools.core-reitit/GET "/my-route" [] {:status 200, :body 1}))]
+    (is (= '["/context" {:responses (com.recompojure.compojure-api1/compojure->reitit-responses {200 {:schema schema.core/Int}})}
+             (com.recompojure.compojure-api1/routes
+               (com.recompojure.compojure-api1/GET "/my-route" [] {:status 200, :body 1}))]
            (dexpand-1
              `(sut/context "/context" []
                            :responses {200 {:schema s/Int}}
@@ -269,7 +269,7 @@
 (deftest capabilities-test
   (testing "expansion"
     (is (= '["/my-route" {:get {:handler (clojure.core/fn [req__0] (clojure.core/let [] (do {:status 200, :body 1})))
-                                :middleware [[(compojure-api-tools.core-reitit/wrap-capabilities-stub :create-incident)]]}}]
+                                :middleware [[(com.recompojure.compojure-api1/wrap-capabilities-stub :create-incident)]]}}]
            (dexpand-1
              `(sut/GET "/my-route" []
                        :capabilities :create-incident
