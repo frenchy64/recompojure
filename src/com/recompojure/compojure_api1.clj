@@ -3,9 +3,38 @@
   "Exposes the API of compojure.api.core v1.1.13 but compiling to reitit."
   (:require [clojure.set :as set]
             [clojure.walk :as walk]
-            ;;TODO remove dependency
-            [compojure.api.common :as common]
             [schema-tools.core :as st]))
+
+;compojure.api.common
+(defn- plain-map?
+  "checks whether input is a map, but not a record"
+  [x] (and (map? x) (not (record? x))))
+
+;compojure.api.common
+(defn- extract-parameters
+  "Extract parameters from head of the list. Parameters can be:
+
+  1. a map (if followed by any form) `[{:a 1 :b 2} :body]` => `{:a 1 :b 2}`
+  2. list of keywords & values `[:a 1 :b 2 :body]` => `{:a 1 :b 2}`
+  3. else => `{}`
+
+  Returns a tuple with parameters and body without the parameters"
+  [c expect-body]
+  (cond
+    (and (plain-map? (first c)) (or (not expect-body) (seq (rest c))))
+    [(first c) (seq (rest c))]
+
+    (keyword? (first c))
+    (let [parameters (->> c
+                          (partition 2)
+                          (take-while (comp keyword? first))
+                          (mapcat identity)
+                          (apply array-map))
+          form (drop (* 2 (count parameters)) c)]
+      [parameters (seq form)])
+
+    :else
+    [{} (seq c)]))
 
 ;;TODO make ns extensible, use these as examples
 (defn- ident->map-stub [& args] (assert nil (str "stub " `ident->map-stub)))
@@ -74,7 +103,7 @@
                  (= [] arg))
     (throw (ex-info (str "Not allowed to bind anything in context, push into HTTP verbs instead: " (pr-str arg))
                     {})))
-  (let [[options body-exprs] (common/extract-parameters args true)
+  (let [[options body-exprs] (extract-parameters args true)
         _ (check-return-banned! options)
         _ (when-some [extra-keys (not-empty (set/difference (set (keys options))
                                                             allowed-context-options))]
@@ -194,7 +223,7 @@
   (assert (or (= [] arg)
               (simple-symbol? arg))
           (pr-str arg))
-  (let [[{:keys [capabilities auth-identity identity-map tags middleware] :as options} body-exprs] (common/extract-parameters args true)
+  (let [[{:keys [capabilities auth-identity identity-map tags middleware] :as options} body-exprs] (extract-parameters args true)
         _ (check-return-banned! options)
         _ (when (simple-symbol? arg)
             (prevent-scoping-difference-error! arg options))

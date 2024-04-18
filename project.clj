@@ -30,8 +30,6 @@
                                     :sign-releases false}]]
 
   :dependencies [[org.clojure/clojure "1.11.2"]
-                 ;; TODO remove
-                 [metosin/compojure-api "1.1.13"]
                  [prismatic/schema "1.4.1"]
                  [metosin/schema-tools "0.13.1"]
                  [metosin/reitit "0.7.0-alpha7"
