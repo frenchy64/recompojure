@@ -1,6 +1,6 @@
 (defproject com.recompojure/recompojure "0.1.0-SNAPSHOT"
-  :description "Compojure compiling to reitit"
-  :url "http://example.com/FIXME"
+  :description "Reitit with a Compojure coat of paint."
+  :url "https://recompojure.com"
   :license {:name "EPL-2.0 OR GPL-2.0-or-later WITH Classpath-exception-2.0"
             :url "https://www.eclipse.org/legal/epl-2.0/"}
   :plugins [[lein-codox "0.10.7"]
