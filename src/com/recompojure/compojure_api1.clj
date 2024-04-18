@@ -1,6 +1,6 @@
 ;; TODO should :query-params be automatically optionalized? :query?
-(ns compojure-api-tools.core-reitit
-  "Exposes the API of compojure.api.core v1.1.13"
+(ns com.recompojure.compojure-api1
+  "Exposes the API of compojure.api.core v1.1.13 but compiling to reitit."
   (:require [clojure.set :as set]
             [clojure.walk :as walk]
             ;;TODO remove dependency
