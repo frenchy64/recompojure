@@ -382,6 +382,12 @@
   `["" {:middleware ~middleware}
     [~@body-exprs]])
 
+(defn undocumented
+  "Routes without route-documentation. Can be used to wrap routes,
+  not satisfying compojure.api.routes/Routing -protocol."
+  [options handlers]
+  (into ["" {:no-doc true}] handlers))
+
 (defmacro load-api [options]
   (assert (and (seq? options)
                (= 2 (count options))
@@ -412,7 +418,12 @@
        Note that middlewares will be executed even if routes in body
        do not match the request uri. Be careful with middlewares that
        have side-effects."
-       {:style/indent 1}
+       {:style/indent 1 :arglists '~'([middleware & body-exprs])}
        [middleware# & body-exprs#]
        (middleware options# middleware# body-exprs#))
-     ))
+     (defmacro ~'undocumented
+       "Routes without route-documentation. Can be used to wrap routes,
+       not satisfying compojure.api.routes/Routing -protocol."
+       {:arglists '~'([& handlers])}
+       [& handlers#]
+       (undocumented options# handlers#))))
