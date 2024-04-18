@@ -12,13 +12,3 @@
   not satisfying compojure.api.routes/Routing -protocol."
   [& handlers]
   (into ["" {:no-doc true}] handlers))
-
-(defmacro middleware
-  "Wraps routes with given middlewares using thread-first macro.
-  Note that middlewares will be executed even if routes in body
-  do not match the request uri. Be careful with middlewares that
-  have side-effects."
-  {:style/indent 1}
-  [middleware & body-exprs]
-  `["" {:middleware ~middleware}
-    [~@body-exprs]])

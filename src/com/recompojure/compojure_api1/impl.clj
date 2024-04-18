@@ -373,6 +373,15 @@
   [options handlers]
   (vec handlers))
 
+(defn middleware
+  "Wraps routes with given middlewares using thread-first macro.
+  Note that middlewares will be executed even if routes in body
+  do not match the request uri. Be careful with middlewares that
+  have side-effects."
+  [options middleware body-exprs]
+  `["" {:middleware ~middleware}
+    [~@body-exprs]])
+
 (defmacro load-api [options]
   (assert (and (seq? options)
                (= 2 (count options))
@@ -397,4 +406,13 @@
        "Create a Ring handler by combining several handlers into one."
        {:style/indent 2 :arglists '~'([& handlers])}
        [& handlers#]
-       (routes options# handlers#))))
+       (routes options# handlers#))
+     (defmacro ~'middleware
+       "Wraps routes with given middlewares using thread-first macro.
+       Note that middlewares will be executed even if routes in body
+       do not match the request uri. Be careful with middlewares that
+       have side-effects."
+       {:style/indent 1}
+       [middleware# & body-exprs#]
+       (middleware options# middleware# body-exprs#))
+     ))
