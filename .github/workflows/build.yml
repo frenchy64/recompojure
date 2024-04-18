@@ -80,5 +80,6 @@ jobs:
           elif [[ "$COMMIT_MSG" == "Release :patch" ]]; then
             lein release :patch
           else
-            lein deploy snapshot
+            echo "TODO enable snapshot deployment"
+            #lein deploy snapshot
           fi
