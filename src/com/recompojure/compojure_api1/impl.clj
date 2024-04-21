@@ -241,15 +241,41 @@
 (defn- append-keys-destructuring [m ks]
   (update m :keys (conj []) ks))
 
-(defn destructuring-key-for-nesting [d k]
-  (when (seq d)
-    (assert (apply distinct? (vals d))))
-  (if-some [[[l _]] (seq (filter (fn [[_ r]] (= r k)) d))]
-    l
-    k))
+;;unsure if needed
+(defn destructuring-key-for-nest
+  "Given a destructing map position, "
+  [d k]
+  (assert (keyword? k))
+  (if (simple-symbol? d)
+    k
+    (do
+      (when d (assert (map? d)))
+      (when (seq d)
+        (assert (apply distinct? (vals d))))
+      (if-some [[[l _]] (seq (filter (fn [[_ r]] (= r k)) d))]
+        l
+        k))))
 
-(comment
-  )
+(defn visit-nested-map-destructuring
+  [d k f]
+  (assert (keyword? k))
+  (let [f (fn [a]
+            (let [res (f a)]
+              (assert (not (keyword? res)))
+              res))]
+    (if (simple-symbol? d)
+      {(f nil) k :as d}
+      (do
+        (when d (assert (map? d)))
+        (when (seq d)
+          (assert (apply distinct? (vals d))))
+        (if-some [[[l _]] (seq (filter (fn [[_ r]] (= r k)) d))]
+          (-> d
+              (dissoc l)
+              (assoc (f l) k))
+          (let [res (f nil)]
+            (assert (not (contains? d res)))
+            (assoc d res k)))))))
 
 (defn- update-in-destructuring [d path f & args]
   (if (empty? path)
