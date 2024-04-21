@@ -337,7 +337,7 @@
              (seq ks) (into (reduce (fn [acc k]
                                       (update acc (keyword (namespace k) "keys")
                                               #(-> (conj (or % []) k) sort vec)))
-                                    {} ks))))))
+                                    {} (sort ks)))))))
 
 (defn canonicalize-destructuring [ast]
   (case (:op ast)

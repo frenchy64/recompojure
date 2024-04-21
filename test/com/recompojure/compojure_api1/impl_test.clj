@@ -84,7 +84,15 @@
   (is (= '{nested :nest :as e}
          (impl/compile-ast '{:op :map, :as e, :nested {:nest {:op :local, :name nested}}})))
   (is (= '{{:as nested, :keys [a]} :nest, :as e}
-         (impl/compile-ast '{:op :map, :as e, :nested {:nest {:op :map, :as nested, :keys #{a}}}}))))
+         (impl/compile-ast '{:op :map, :as e, :nested {:nest {:op :map, :as nested, :keys #{a}}}})))
+  (is (= '{{:as nested, :keys [a]} :nest, :as e}
+         (-> '{{:as nested, :keys [a]} :nest, :as e}
+             impl/destructuring-ast
+             impl/compile-ast)))
+  (is (= '{{:as nested, :keys [a b c]} :nest, :as e}
+         (-> '{{:as nested, :keys [b a c]} :nest, :as e}
+             impl/destructuring-ast
+             impl/compile-ast))))
 
 (def canon #(-> % impl/destructuring-ast impl/canonicalize-destructuring impl/compile-ast))
 
