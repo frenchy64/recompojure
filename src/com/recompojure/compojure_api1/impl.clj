@@ -213,6 +213,91 @@
       ~@(some-> (not-empty reitit-opts) list)
       (routes '~(options-sym OPTIONS) ~(vec body-exprs))]))
 
+(defn bindings-tree [scoped options]
+  (reduce (fn [acc {:keys [name op path default]}]
+            (case op
+              :get-in-request (update-in acc
+                                         (-> [:get-in-request]
+                                             (into (interleave (repeat :children) path))
+                                             (conj :syms name))
+                                         (fn [old]
+                                           (assert (not old))
+                                           {:default default
+                                            :path path}))))
+          {} scoped))
+
+(comment
+  (bindings-tree
+    [{:name 'req
+      :op :get-in-request
+      :path []}]
+    nil))
+
+(defn- add-as-destructuring [m k]
+  (update m :as (fn [old]
+                  (assert (or (= old k) (not old)))
+                  k)))
+
+(defn- append-keys-destructuring [m ks]
+  (update m :keys (conj []) ks))
+
+(defn destructuring-key-for-nesting [d k]
+  (when (seq d)
+    (assert (apply distinct? (vals d))))
+  (if-some [[[l _]] (seq (filter (fn [[_ r]] (= r k)) d))]
+    l
+    k))
+
+(comment
+  )
+
+(defn- update-in-destructuring [d path f & args]
+  (if (empty? path)
+    (apply f d args)
+    (let [rec (fn rec [d path]
+                (if (next path)
+                  (into {})
+                  (rec )
+                  ))]
+      (rec d path))))
+
+(comment
+  (update-in-destructuring
+    {}
+    []
+    add-as-destructuring :as 'foo)
+  (update-in-destructuring
+    {{:keys [query]} :parameters}
+    [:parameters]
+    append-keys-destructuring ['foo])
+  ;=> {{:keys [query foo]} :parameters}
+  )
+
+(defn destructure-bindings-tree [t options]
+  (if-not (:children t)
+    (let [{:keys [syms]} t]
+      (assert (<= (count syms) 1))
+      (assert (every? (comp nil? :default) (vals syms)))
+      (or (ffirst syms) (*gensym* "_")))
+    (reduce (fn [acc {:keys [syms]}]
+              (assert (<= (count syms) 1))
+              (reduce (fn [acc [sym {:keys [default path]}]]
+                        (if (empty? path)
+                          (update acc :as (fn [old]
+                                            (assert (not old))
+                                            sym))
+                          (update-in acc path (fn [old]
+                                                (assert (not old))
+                                                sym))))
+                      acc syms))
+            nil t)))
+
+(comment
+  (destructure-bindings-tree
+    '{:syms {req {:default nil, :path []}}}
+    nil)
+  )
+
 (defn ^:private restructure-endpoint [http-kw [path arg & args] OPTIONS]
   (assert (simple-keyword? http-kw))
   (assert (or (= [] arg)
@@ -256,63 +341,72 @@
         gparameters (delay (*gensym* "parameters"))
         gidentity (delay (*gensym* "identity"))
         needs-parameters? (or query-params path-params query body)
+        ;; scoped = [{:bind sym :needs {}}]
         ;; `gs` are uncapturable variables via gensym. they are bound first so
         ;; they can be bound to capturable expressions.
         ;; `scoped` are capturable variables provided by user. they are bound last,
         ;; and they are bound to uncapturable expressions.
-        {:keys [scoped gs]
-         :or {gs [] scoped []}} (merge-with
+        {:keys [scoped]
+         :or {scoped []}} (merge-with
                                   into
                                   (when (simple-symbol? arg)
-                                    {:scoped [arg greq]})
-                                  (when needs-parameters?
-                                    {:gs [@gparameters (list :parameters greq)]})
+                                    {:scoped [{:name arg
+                                               :op :get-in-request}]})
                                   (when query-params
-                                    (let [gquery (*gensym* "query")]
-                                      (apply merge-with into 
-                                             {:gs [gquery (list :query @gparameters)]}
-                                             (map (fn [[sym {:keys [default]}]]
-                                                    (let [gdefault (*gensym* (str (name sym) "-default"))]
-                                                      {:gs [gdefault default]
-                                                       :scoped [sym (list `get gquery (keyword sym) gdefault)]}))
-                                                  query-params))))
+                                    (apply merge-with into 
+                                           (map (fn [[sym {:keys [default]}]]
+                                                  {:scoped [{:name sym
+                                                             :op :get-in-request
+                                                             :path [:parameters :query (keyword sym)]
+                                                             ;;TODO bind first if needed
+                                                             :default default}]})
+                                                query-params)))
                                   (when path-params
                                     (let [gpath (*gensym* "path")]
                                       (apply merge-with into 
-                                             {:gs [gpath (list :path @gparameters)]}
                                              (map (fn [[sym {:keys [schema] :as opts}]]
                                                     (assert (= [:schema] (keys opts)) "no default allowed for path params")
-                                                    {:scoped [sym (list `get gpath (keyword sym))]})
+                                                    {:scoped [{:name sym
+                                                               :op :get-in-request
+                                                               :path [:parameters :path (keyword sym)]}]})
                                                   path-params))))
                                   (when-some [{:keys [bind]} query]
-                                    (let [gquery (*gensym* "query")]
-                                      {:gs [gquery (list :query @gparameters)]
-                                       :scoped [bind gquery]}))
+                                    {:scoped [{:name bind
+                                               :op :get-in-request
+                                               :path [:parameters :query]}]})
                                   (when-some [{:keys [bind]} body]
-                                    (let [gbody (*gensym* "body")]
-                                      {:gs [gbody (list :body @gparameters)]
-                                       :scoped [bind gbody]}))
-                                  (when (or auth-identity identity-map)
-                                    {:gs [@gidentity (list :identity greq)]})
+                                    {:scoped [{:name bind
+                                               :op :get-in-request
+                                               :path [:parameters :body]}]})
                                   (when auth-identity
                                     (assert (simple-symbol? auth-identity) (str ":auth-identity must be a simple symbol: "
                                                                                 (pr-str auth-identity)))
-                                    {:scoped [auth-identity @gidentity]})
+                                    {:scoped [{:name auth-identity
+                                               :op :get-in-request
+                                               :path [:identity]}]})
                                   (when identity-map
                                     (assert (simple-symbol? identity-map) (str ":identity-map must be a simple symbol: "
                                                                                (pr-str identity-map)))
-                                    {:scoped [identity-map (list `ident->map-stub @gidentity)]}))
-        _ (when (seq gs)
-            (assert (apply distinct? (map first (partition 2 gs)))))
+                                    {:scoped [{:name identity-map
+                                               :op :get-in-request
+                                               :path [:identity]
+                                               :wrap #(list `ident->map-stub %)}]}))
         _ (when (seq scoped)
-            (let [names (map first (partition 2 scoped))]
+            (let [names (map :name scoped)]
               ;; we can lift this once we ensure we parse options deterministically. i.e., that `options` is
               ;; in the same order as provided by the user.
               (assert (apply distinct? names)
                       (str "ERROR: cannot shadow variables in endpoints, please rename to avoid clashes: "
-                           (pr-str (sort names))))))]
+                           (pr-str (sort names))))))
+        #_
+        {:get-in-request {:children {:parameters {:children
+                                                  :syms}}
+                          :syms {'a {:default default}}}}
+        t (bindings-tree scoped) 
+        req-destructure (reduce (fn [])
+                                 {:get-in-request bindings-tree})]
     [path {http-kw (cond-> {:handler `(fn [~greq]
-                                        (let ~(into gs scoped)
+                                        (let ~(into (assert nil) #_gs scoped)
                                           (do ~@body-exprs)))}
                      (contains? options :description) (assoc-in [:swagger :description] (:description options))
                      ;; literal in compojure-api, so we conserve the semantics

@@ -2,7 +2,6 @@
   (:require [clojure.test :refer [is]]
             [com.recompojure.compojure-api1 :as sut]
             [com.recompojure.compojure-api1.impl :as impl]
-            [io.github.frenchy64.fully-satisfies.never :refer [never?]]
             [io.github.frenchy64.fully-satisfies.uncaught-testing-contexts :refer [testing deftest]]
             [reitit.coercion.schema :as rcs]
             [reitit.ring :as ring]
