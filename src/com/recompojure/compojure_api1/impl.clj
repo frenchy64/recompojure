@@ -233,10 +233,17 @@
       :path []}]
     nil))
 
-(defn- add-as-destructuring [m k]
-  (update m :as (fn [old]
-                  (assert (or (= old k) (not old)))
-                  k)))
+(defn add-as-destructuring [m sym]
+  (assert (simple-symbol? sym))
+  (if (nil? m)
+    sym
+    (if (symbol? m)
+      (do (assert (= m sym))
+          m)
+      (do (assert (map? m))
+          (update m :as (fn [old]
+                          (assert (or (= old sym) (not old)))
+                          sym))))))
 
 (defn- append-keys-destructuring [m ks]
   (update m :keys (conj []) ks))
@@ -277,15 +284,40 @@
             (assert (not (contains? d res)))
             (assoc d res k)))))))
 
-(defn- update-in-destructuring [d path f & args]
+(defn update-in-map-destructuring [d path f & args]
   (if (empty? path)
     (apply f d args)
     (let [rec (fn rec [d path]
                 (if (next path)
-                  (into {})
-                  (rec )
-                  ))]
+                  (visit-nested-map-destructuring
+                    d (first path) #(rec % (next path)))
+                  (visit-nested-map-destructuring
+                    d (first path) #(apply f % args))))]
       (rec d path))))
+
+(defn destructuring-ast [d]
+  (cond
+    (nil? d) {:op :placeholder}
+    (simple-symbol? d) {:op :local :name d}
+    (map? d) (let [{special true nested false} (group-by (comp keyword? first) d)]
+               (when (seq nested)
+                 (assert (apply distinct? (vals nested))))
+               (cond-> {:op :map}
+                 (seq special) (assoc :special (into {} special))
+                 (seq nested) (assoc :nested (into {} (map (fn [[nest k]]
+                                                             [k (destructuring-ast nest)]))
+                                                   nested))))
+    :else (throw (ex-info (str "Unsupported destructuring: " (pr-str d)) {:d d}))))
+
+(defn compile-ast [ast]
+  (case (:op ast)
+    :placeholder (*gensym* "_")
+    :local (:name ast)
+    :map (let [{:keys [special nested]} ast
+               nested (update-vals nested compile-ast)]
+           (when (seq nested) (assert (apply distinct? (vals nested))))
+           (into (or special {})
+                 (zipmap (vals nested) (keys nested))))))
 
 (comment
   (update-in-destructuring

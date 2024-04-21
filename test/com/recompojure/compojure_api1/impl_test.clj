@@ -33,6 +33,65 @@
                                :a
                                (fn [d] (update d :keys conj 'a))))))
 
+(deftest add-as-destructuring-test
+  (is (= 'a (impl/add-as-destructuring nil 'a)))
+  (is (= 'a (impl/add-as-destructuring 'a 'a)))
+  (is (thrown? AssertionError (impl/add-as-destructuring 'sym 'a)))
+  (is (thrown? AssertionError (impl/add-as-destructuring '{:as sym} 'a)))
+  (is (thrown? AssertionError (impl/add-as-destructuring '[:as sym] 'a)))
+  (is (= '{:keys [b] :as a} (impl/add-as-destructuring '{:keys [b]} 'a)))
+  (is (= '{:keys [b] :as a} (impl/add-as-destructuring '{:keys [b]} 'a))))
+
+(deftest update-in-map-destructuring-test
+  (is (= '{{:keys [b]} :a, :as c}
+         (impl/update-in-map-destructuring
+           '{{:keys [b]} :a}
+           []
+           impl/add-as-destructuring 'c)))
+  (is (= '{{:keys [b] :as c} :a}
+         (impl/update-in-map-destructuring
+           '{{:keys [b]} :a}
+           [:a]
+           impl/add-as-destructuring 'c)))
+  ;;TODO smarter: {{:keys [b]} :a}
+  (is (= '{{b :b :keys [b]} :a}
+         (impl/update-in-map-destructuring
+           '{{:keys [b]} :a}
+           [:a :b]
+           impl/add-as-destructuring 'c))))
+
+(deftest destructuring-ast-test
+  (is (= {:op :placeholder} (impl/destructuring-ast nil)))
+  (is (= {:op :local :name 'a} (impl/destructuring-ast 'a)))
+  (is (= {:op :map} (impl/destructuring-ast '{})))
+  (is (= '{:op :map, :nested {:nest {:op :local, :name nested}}} (impl/destructuring-ast '{nested :nest})))
+  (is (= '{:op :map, :special {:as e}, :nested {:nest {:op :local, :name nested}}}
+         (impl/destructuring-ast '{nested :nest :as e})))
+  (is (= '{:op :map, :special {:as e}, :nested {:nest {:op :local, :name nested}}}
+         (impl/destructuring-ast '{nested :nest :as e})))
+  (is (= '{:op :map
+           :special {:as e}
+           :nested {:nest {:op :map
+                           :special {:keys [a]
+                                     :as nested}}}}
+         (impl/destructuring-ast '{{:keys [a] :as nested} :nest :as e}))))
+
+(deftest compile-ast-test
+  (is (= '_ (binding [impl/*gensym* symbol]
+              (impl/compile-ast {:op :placeholder}))))
+  (is (= 'a (impl/compile-ast {:op :local :name 'a})))
+  (is (= {} (impl/compile-ast {:op :map})))
+  (is (= '{nested :nest} (impl/compile-ast '{:op :map, :nested {:nest {:op :local, :name nested}}})))
+  (is (= '{nested :nest :as e}
+         (impl/compile-ast '{:op :map, :special {:as e}, :nested {:nest {:op :local, :name nested}}})))
+  (is (= '{nested :nest :as e} (impl/compile-ast '{:op :map, :special {:as e}, :nested {:nest {:op :local, :name nested}}})))
+  (is (= '{{:keys [a] :as nested} :nest :as e}
+         (impl/compile-ast '{:op :map
+                             :special {:as e}
+                             :nested {:nest {:op :map
+                                             :special {:keys [a]
+                                                       :as nested}}}}))))
+
 (deftest bindings-tree-test
   (is (= '{}
          (impl/bindings-tree
