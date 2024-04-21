@@ -65,32 +65,26 @@
   (is (= {:op :local :name 'a} (impl/destructuring-ast 'a)))
   (is (= {:op :map} (impl/destructuring-ast '{})))
   (is (= '{:op :map, :nested {:nest {:op :local, :name nested}}} (impl/destructuring-ast '{nested :nest})))
-  (is (= '{:op :map, :special {:as e}, :nested {:nest {:op :local, :name nested}}}
+  (is (= '{:op :map, :as e, :nested {:nest {:op :local, :name nested}}}
          (impl/destructuring-ast '{nested :nest :as e})))
-  (is (= '{:op :map, :special {:as e}, :nested {:nest {:op :local, :name nested}}}
+  (is (= '{:op :map, :as e, :nested {:nest {:op :local, :name nested}}}
          (impl/destructuring-ast '{nested :nest :as e})))
-  (is (= '{:op :map
-           :special {:as e}
-           :nested {:nest {:op :map
-                           :special {:keys [a]
-                                     :as nested}}}}
+  (is (= '{:op :map, :as e, :nested {:nest {:op :map, :as nested, :keys #{a}}}}
          (impl/destructuring-ast '{{:keys [a] :as nested} :nest :as e}))))
 
 (deftest compile-ast-test
-  (is (= '_ (binding [impl/*gensym* symbol]
-              (impl/compile-ast {:op :placeholder}))))
+  (is (= '___# (binding [impl/*gensym* (comp symbol #(str % "__#"))]
+                 (impl/compile-ast {:op :placeholder}))))
+  (is (= 'default__#
+         (binding [impl/*gensym* (comp symbol #(str % "__#"))]
+           (impl/compile-ast {:op :placeholder :name "default"}))))
   (is (= 'a (impl/compile-ast {:op :local :name 'a})))
   (is (= {} (impl/compile-ast {:op :map})))
   (is (= '{nested :nest} (impl/compile-ast '{:op :map, :nested {:nest {:op :local, :name nested}}})))
   (is (= '{nested :nest :as e}
-         (impl/compile-ast '{:op :map, :special {:as e}, :nested {:nest {:op :local, :name nested}}})))
-  (is (= '{nested :nest :as e} (impl/compile-ast '{:op :map, :special {:as e}, :nested {:nest {:op :local, :name nested}}})))
-  (is (= '{{:keys [a] :as nested} :nest :as e}
-         (impl/compile-ast '{:op :map
-                             :special {:as e}
-                             :nested {:nest {:op :map
-                                             :special {:keys [a]
-                                                       :as nested}}}}))))
+         (impl/compile-ast '{:op :map, :as e, :nested {:nest {:op :local, :name nested}}})))
+  (is (= '{{:as nested, :keys [a]} :nest, :as e}
+         (impl/compile-ast '{:op :map, :as e, :nested {:nest {:op :map, :as nested, :keys #{a}}}}))))
 
 (deftest bindings-tree-test
   (is (= '{}

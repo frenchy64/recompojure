@@ -299,11 +299,27 @@
   (cond
     (nil? d) {:op :placeholder}
     (simple-symbol? d) {:op :local :name d}
-    (map? d) (let [{special true nested false} (group-by (comp keyword? first) d)]
+    (map? d) (let [{special true nested false} (group-by (comp keyword? first) d)
+                   as (:as d)
+                   all-keys (into #{} (comp (distinct)
+                                            (mapcat
+                                              (fn [[k v]]
+                                                (when (= "keys" (name k))
+                                                  (assert (every? simple-symbol? v))
+                                                  (let [ns (namespace k)]
+                                                    (map #(symbol ns (name %)) v))))))
+                                  special)
+                   _ (let [extra (into {} (remove (fn [[k]]
+                                                    {:pre [(keyword? k)]}
+                                                    (or (= :as k)
+                                                        (= "keys" (name k)))))
+                                       special)]
+                       (assert (empty? extra) (str "Unsupported keys in: " extra)))]
                (when (seq nested)
                  (assert (apply distinct? (vals nested))))
                (cond-> {:op :map}
-                 (seq special) (assoc :special (into {} special))
+                 as (assoc :as as)
+                 (seq all-keys) (assoc :keys all-keys)
                  (seq nested) (assoc :nested (into {} (map (fn [[nest k]]
                                                              [k (destructuring-ast nest)]))
                                                    nested))))
@@ -311,13 +327,23 @@
 
 (defn compile-ast [ast]
   (case (:op ast)
-    :placeholder (*gensym* "_")
+    :placeholder (*gensym* (or (:name ast) "_"))
     :local (:name ast)
-    :map (let [{:keys [special nested]} ast
+    :map (let [{ks :keys :keys [as nested]} ast
                nested (update-vals nested compile-ast)]
            (when (seq nested) (assert (apply distinct? (vals nested))))
-           (into (or special {})
-                 (zipmap (vals nested) (keys nested))))))
+           (cond-> (zipmap (vals nested) (keys nested))
+             as (assoc :as as)
+             (seq ks) (into (reduce (fn [acc k]
+                                      (update acc (keyword (namespace k) "keys")
+                                              #(-> (conj (or % []) k) sort vec)))
+                                    {} ks))))))
+
+(defn canonicalize-destructuring [ast]
+  (case (:op ast)
+    (:placeholder :local) ast
+    :map (let [{:keys [special nested]} ast]
+           )))
 
 (comment
   (update-in-destructuring
