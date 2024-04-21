@@ -87,7 +87,7 @@
                     {}))))
 
 
-(def ^:private allowed-endpoint-options #{:responses :capabilities :auth-identity :identity-map :query-params :path-params
+(def ^:private allowed-endpoint-options #{:responses :query-params :path-params
                                           :description :tags :no-doc :summary :produces :middleware :query :body})
 (comment
   ;; todo list
@@ -213,7 +213,7 @@
       ~@(some-> (not-empty reitit-opts) list)
       (routes '~(options-sym OPTIONS) ~(vec body-exprs))]))
 
-(defn ^:private restructure-endpoint [http-kw [path arg & args] options]
+(defn ^:private restructure-endpoint [http-kw [path arg & args] OPTIONS]
   (assert (simple-keyword? http-kw))
   (assert (or (= [] arg)
               (simple-symbol? arg))
@@ -223,7 +223,9 @@
         _ (when (simple-symbol? arg)
             (prevent-scoping-difference-error! arg options))
         _ (when-some [extra-keys (not-empty (set/difference (set (keys options))
-                                                            allowed-endpoint-options))]
+                                                            ;;TODO append
+                                                            allowed-endpoint-options
+                                                            (:extra-allowed-endpoint-options OPTIONS)))]
             (throw (ex-info (str "Not allowed these options in endpoints: "
                                  (pr-str (sort extra-keys)))
                             {})))

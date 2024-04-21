@@ -13,6 +13,7 @@
             [schema.core :as s]
             [schema.utils :as su]))
 
+#_
 (defmacro with-deterministic-gensym [& body]
   `(with-bindings {#'impl/*gensym* (let [a# (atom -1)]
                                      (fn [s#]
@@ -21,8 +22,18 @@
                                        (symbol (str s# "__" (swap! a# inc')))))}
      (do ~@body)))
 
+(defmacro with-no-repeat-gensym [& body]
+  `(with-bindings {#'impl/*gensym* (let [seen# (atom #{})]
+                                     (fn [s#]
+                                       {:pre [(string? s#)]
+                                        :post [(symbol? ~'%)]}
+                                       (assert (not (contains? (first (swap-vals! seen# conj s#)) s#))
+                                               (str "Reused " s#))
+                                       (symbol (str s# "__#"))))}
+     (do ~@body)))
+
 (defn dexpand-1 [form]
-  (with-deterministic-gensym
+  (with-no-repeat-gensym #_with-deterministic-gensym
     (macroexpand-1 form)))
 
 ;; adapted from clojure.repl/root-cause, but unwraps compiler exceptions
@@ -107,7 +118,7 @@
              :middleware [[~'render-resource-file]]
              ~'routes)
           "Combining :middleware and :capabilities not yet supported. Please use :middleware [(com.recompojure.compojure-api1/wrap-capabilities-stub capabilities)] instead of :capabilities capabilities.\nThe complete middleware might look like: :middleware (conj [[render-resource-file]] (com.recompojure.compojure-api1/wrap-capabilities-stub capabilities))."))
-      (is (= '["/my-route" {:get {:handler (clojure.core/fn [req__0] (clojure.core/let [] (do identity)))
+      (is (= '["/my-route" {:get {:handler (clojure.core/fn [req__#] (clojure.core/let [] (do identity)))
                                   :middleware [[render-resource-file]]}}]
              (dexpand-1
                `(sut/GET
@@ -184,7 +195,7 @@
              identity)))))
 
 (deftest get-test
-  (is (= '["/my-route" {:get {:handler (clojure.core/fn [req__0] (clojure.core/let [] (do {:status 200})))}}]
+  (is (= '["/my-route" {:get {:handler (clojure.core/fn [req__#] (clojure.core/let [] (do {:status 200})))}}]
          (dexpand-1
            `(sut/GET "/my-route" []
                      {:status 200}))))
@@ -200,7 +211,7 @@
 
 (deftest responses-test
   (testing "GET"
-    (is (= '["/my-route" {:get {:handler (clojure.core/fn [req__0] (clojure.core/let [] (do {:status 200, :body 1})))
+    (is (= '["/my-route" {:get {:handler (clojure.core/fn [req__#] (clojure.core/let [] (do {:status 200, :body 1})))
                                 :responses (com.recompojure.compojure-api1.impl/compojure->reitit-responses {200 {:schema schema.core/Int}})}}]
            (dexpand-1
              `(sut/GET "/my-route" []
@@ -270,7 +281,7 @@
 #_;;TODO
 (deftest capabilities-test
   (testing "expansion"
-    (is (= '["/my-route" {:get {:handler (clojure.core/fn [req__0] (clojure.core/let [] (do {:status 200, :body 1})))
+    (is (= '["/my-route" {:get {:handler (clojure.core/fn [req__#] (clojure.core/let [] (do {:status 200, :body 1})))
                                 :middleware [[(com.recompojure.compojure-api1/wrap-capabilities-stub :create-incident)]]}}]
            (dexpand-1
              `(sut/GET "/my-route" []
@@ -370,9 +381,9 @@
       "Not allowed these options in `context`, push into HTTP verbs instead: (:auth-identity)"))
   (testing "GET"
     (testing "expansion"
-      (is (= '["/my-route" {:get {:handler (clojure.core/fn [req__0]
-                                             (clojure.core/let [identity__1 (:identity req__0)
-                                                                scoped-identity identity__1]
+      (is (= '["/my-route" {:get {:handler (clojure.core/fn [req__#]
+                                             (clojure.core/let [identity__# (:identity req__#)
+                                                                scoped-identity identity__#]
                                                (do clojure.core/identity)))}}]
              (dexpand-1
                `(sut/GET
@@ -405,10 +416,10 @@
       "Not allowed these options in `context`, push into HTTP verbs instead: (:path-params)"))
   (testing "endpoints"
     (testing "expansion"
-      (is (= '["/my-route" {:get {:handler (clojure.core/fn [req__0]
-                                             (clojure.core/let [parameters__1 (:parameters req__0)
-                                                                path__2 (:path parameters__1)
-                                                                id (clojure.core/get path__2 :id)]
+      (is (= '["/my-route" {:get {:handler (clojure.core/fn [req__#]
+                                             (clojure.core/let [parameters__# (:parameters req__#)
+                                                                path__# (:path parameters__#)
+                                                                id (clojure.core/get path__# :id)]
                                                (do identity)))
                                   :parameters {:path {:id schema.core/Str}}}}]
              (dexpand-1
@@ -506,11 +517,11 @@
       "Not allowed these options in `context`, push into HTTP verbs instead: (:query-params)"))
   (testing "GET"
     (testing "expansion"
-      (is (= '["/my-route" {:get {:handler (clojure.core/fn [req__0]
-                                             (clojure.core/let [parameters__1 (:parameters req__0)
-                                                                query__2 (:query parameters__1)
-                                                                wait_for-default__3 default
-                                                                wait_for (clojure.core/get query__2 :wait_for wait_for-default__3)]
+      (is (= '["/my-route" {:get {:handler (clojure.core/fn [req__#]
+                                             (clojure.core/let [parameters__# (:parameters req__#)
+                                                                query__# (:query parameters__#)
+                                                                wait_for-default__# default
+                                                                wait_for (clojure.core/get query__# :wait_for wait_for-default__#)]
                                                (do clojure.core/identity)))
                                   :parameters {:query (schema-tools.core/optional-keys
                                                         {:wait_for (ring.swagger.json-schema/describe
@@ -588,9 +599,9 @@
       "Not allowed these options in `context`, push into HTTP verbs instead: (:identity-map)"))
   (testing "GET"
     (testing "expansion"
-      (is (= '["/my-route" {:get {:handler (clojure.core/fn [req__0]
-                                             (clojure.core/let [identity__1 (:identity req__0)
-                                                                scoped-identity-map (ctia.auth/ident->map identity__1)]
+      (is (= '["/my-route" {:get {:handler (clojure.core/fn [req__#]
+                                             (clojure.core/let [identity__# (:identity req__#)
+                                                                scoped-identity-map (ctia.auth/ident->map identity__#)]
                                                (do clojure.core/identity)))}}]
              (dexpand-1
                `(sut/GET
@@ -598,10 +609,10 @@
                   :identity-map ~'scoped-identity-map
                   identity))))
       (testing "with auth-identity, shares :identity"
-        (is (= '["/my-route" {:get {:handler (clojure.core/fn [req__0]
-                                               (clojure.core/let [identity__1 (:identity req__0)
-                                                                  scoped-identity identity__1
-                                                                  scoped-identity-map (ctia.auth/ident->map identity__1)]
+        (is (= '["/my-route" {:get {:handler (clojure.core/fn [req__#]
+                                               (clojure.core/let [identity__# (:identity req__#)
+                                                                  scoped-identity identity__#
+                                                                  scoped-identity-map (ctia.auth/ident->map identity__#)]
                                                  (do clojure.core/identity)))}}]
                (dexpand-1
                  `(sut/GET
@@ -663,7 +674,7 @@
                :description descriptions-are-expressions
                identity)))))
   (testing "GET"
-    (is (= '["/my-route" {:get {:handler (clojure.core/fn [req__0] (clojure.core/let [] (do identity)))
+    (is (= '["/my-route" {:get {:handler (clojure.core/fn [req__#] (clojure.core/let [] (do identity)))
                                 :swagger {:description "a description"}}}]
            (dexpand-1
              `(sut/GET
@@ -696,7 +707,7 @@
                :tags tags-are-compile-time-literals
                identity)))))
   (testing "GET"
-    (is (= '["/my-route" {:get {:handler (clojure.core/fn [req__0] (clojure.core/let [] (do identity)))
+    (is (= '["/my-route" {:get {:handler (clojure.core/fn [req__#] (clojure.core/let [] (do identity)))
                                 :swagger {:tags (quote tags-are-compile-time-literals)}}}]
            (dexpand-1
              `(sut/GET
@@ -720,7 +731,7 @@
          ~'routes)
       "Not allowed these options in `context`, push into HTTP verbs instead: (:no-doc)"))
   (testing "GET"
-    (is (= '["/my-route" {:get {:handler (clojure.core/fn [req__0] (clojure.core/let [] (do identity)))
+    (is (= '["/my-route" {:get {:handler (clojure.core/fn [req__#] (clojure.core/let [] (do identity)))
                                 :swagger {:no-doc an-expression}}}]
            (dexpand-1
              `(sut/GET
@@ -729,7 +740,7 @@
                 ~'identity))))
     (testing "literals"
       (doseq [v [true false nil]]
-        (is (= `["/my-route" {:get {:handler (clojure.core/fn [~'req__0] (clojure.core/let [] (do ~'identity)))
+        (is (= `["/my-route" {:get {:handler (clojure.core/fn [~'req__#] (clojure.core/let [] (do ~'identity)))
                                     :swagger {:no-doc ~v}}}]
                (dexpand-1
                  `(sut/GET
@@ -762,7 +773,7 @@
              :summary summarys-are-expressions
              identity)))))
   (testing "GET"
-    (is (= '["/my-route" {:get {:handler (clojure.core/fn [req__0] (clojure.core/let [] (do identity)))
+    (is (= '["/my-route" {:get {:handler (clojure.core/fn [req__#] (clojure.core/let [] (do identity)))
                                 :swagger {:summary an-expression}}}]
            (dexpand-1
              `(sut/GET
@@ -771,7 +782,7 @@
                 ~'identity))))
     (testing "literals"
       (doseq [v ["summary" true false nil]]
-        (is (= `["/my-route" {:get {:handler (clojure.core/fn [~'req__0] (clojure.core/let [] (do ~'identity)))
+        (is (= `["/my-route" {:get {:handler (clojure.core/fn [~'req__#] (clojure.core/let [] (do ~'identity)))
                                     :swagger {:summary ~v}}}]
                (dexpand-1
                  `(sut/GET
@@ -796,7 +807,7 @@
          ~'routes)
       "Not allowed these options in `context`, push into HTTP verbs instead: (:produces)"))
   (testing "GET"
-    (is (= '["/my-route" {:get {:handler (clojure.core/fn [req__0] (clojure.core/let [] (do identity)))
+    (is (= '["/my-route" {:get {:handler (clojure.core/fn [req__#] (clojure.core/let [] (do identity)))
                                 :swagger {:produces an-expression}}}]
            (dexpand-1
              `(sut/GET
@@ -805,7 +816,7 @@
                 ~'identity))))
     (testing "literals"
       (doseq [v ["produces" true false nil]]
-        (is (= `["/my-route" {:get {:handler (clojure.core/fn [~'req__0] (clojure.core/let [] (do ~'identity)))
+        (is (= `["/my-route" {:get {:handler (clojure.core/fn [~'req__#] (clojure.core/let [] (do ~'identity)))
                                     :swagger {:produces ~v}}}]
                (dexpand-1
                  `(sut/GET
@@ -872,10 +883,10 @@
                        Schema]
              ~'routes)
           "Cannot use both :query-params and :query, please combine them."))
-      (is (= '["/my-route" {:get {:handler (clojure.core/fn [req__0]
-                                             (clojure.core/let [parameters__1 (:parameters req__0)
-                                                                query__2 (:query parameters__1)
-                                                                {foo :bar :as params} query__2]
+      (is (= '["/my-route" {:get {:handler (clojure.core/fn [req__#]
+                                             (clojure.core/let [parameters__# (:parameters req__#)
+                                                                query__# (:query parameters__#)
+                                                                {foo :bar :as params} query__#]
                                                (do routes)))
                                   :parameters {:query Schema}}}]
              (dexpand-1
@@ -943,10 +954,10 @@
          :body ~'[{foo :bar :as params}]
          ~'routes)
       ":body must be a vector of length 2: [{foo :bar, :as params}]")
-    (is (= '["/my-route" {:get {:handler (clojure.core/fn [req__0]
-                                           (clojure.core/let [parameters__1 (:parameters req__0)
-                                                              body__2 (:body parameters__1)
-                                                              {foo :bar :as body} body__2]
+    (is (= '["/my-route" {:get {:handler (clojure.core/fn [req__#]
+                                           (clojure.core/let [parameters__# (:parameters req__#)
+                                                              body__# (:body parameters__#)
+                                                              {foo :bar :as body} body__#]
                                              (do routes)))
                                 :parameters {:body Schema}}}]
            (dexpand-1
