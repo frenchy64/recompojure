@@ -86,6 +86,13 @@
   (is (= '{{:as nested, :keys [a]} :nest, :as e}
          (impl/compile-ast '{:op :map, :as e, :nested {:nest {:op :map, :as nested, :keys #{a}}}}))))
 
+(def canon #(-> % impl/destructuring-ast impl/canonicalize-destructuring impl/compile-ast))
+
+(deftest canonicalize-destructuring-test
+  (is (= 'a (canon 'a)))
+  (is (= '{:keys [foo]} (canon '{foo :foo})))
+  )
+
 (deftest bindings-tree-test
   (is (= '{}
          (impl/bindings-tree

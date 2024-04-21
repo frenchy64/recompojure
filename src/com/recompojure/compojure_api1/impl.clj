@@ -342,8 +342,19 @@
 (defn canonicalize-destructuring [ast]
   (case (:op ast)
     (:placeholder :local) ast
-    :map (let [{:keys [special nested]} ast]
-           )))
+    :map (let [{ks :keys :keys [nested as]} ast]
+           (reduce (fn [acc [k nest]]
+                     (prn "ks" ks)
+                     (prn "k" k)
+                     (prn "nest" nest)
+                     ;; {a :a} => {:keys [a]}
+                     (if (and (= :local (:op nest))
+                              (= k (keyword (:name nest))))
+                       (-> ast
+                           (update :keys (fnil conj #{}) (:name nest))
+                           (update :nested dissoc k))
+                       ast))
+                   ast nested))))
 
 (comment
   (update-in-destructuring
