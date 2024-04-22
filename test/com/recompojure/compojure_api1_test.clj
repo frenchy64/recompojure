@@ -117,7 +117,7 @@
              :middleware [[~'render-resource-file]]
              ~'routes)
           "Combining :middleware and :capabilities not yet supported. Please use :middleware [(com.recompojure.compojure-api1/wrap-capabilities-stub capabilities)] instead of :capabilities capabilities.\nThe complete middleware might look like: :middleware (conj [[render-resource-file]] (com.recompojure.compojure-api1/wrap-capabilities-stub capabilities))."))
-      (is (= '["/my-route" {:get {:handler (clojure.core/fn [req__#] (clojure.core/let [] (do identity)))
+      (is (= '["/my-route" {:get {:handler (clojure.core/fn [req__#] identity)
                                   :middleware [[render-resource-file]]}}]
              (dexpand-1
                `(sut/GET
@@ -194,7 +194,7 @@
              identity)))))
 
 (deftest get-test
-  (is (= '["/my-route" {:get {:handler (clojure.core/fn [req__#] (clojure.core/let [] (do {:status 200})))}}]
+  (is (= '["/my-route" {:get {:handler (clojure.core/fn [req__#] {:status 200})}}]
          (dexpand-1
            `(sut/GET "/my-route" []
                      {:status 200}))))
@@ -210,7 +210,7 @@
 
 (deftest responses-test
   (testing "GET"
-    (is (= '["/my-route" {:get {:handler (clojure.core/fn [req__#] (clojure.core/let [] (do {:status 200, :body 1})))
+    (is (= '["/my-route" {:get {:handler (clojure.core/fn [req__#] {:status 200, :body 1})
                                 :responses (com.recompojure.compojure-api1.impl/compojure->reitit-responses {200 {:schema schema.core/Int}})}}]
            (dexpand-1
              `(sut/GET "/my-route" []
@@ -368,42 +368,6 @@
                (app {:request-method :get
                      :uri "/foo/my-route"
                      :identity (->WriteIdentity 'name 'group)})))))))
-
-#_ ;;TODO
-(deftest auth-identity-test
-  (testing "context"
-    (is-banned-macro
-      `(sut/context
-         "/my-route" []
-         :auth-identity ~'identity
-         ~'routes)
-      "Not allowed these options in `context`, push into HTTP verbs instead: (:auth-identity)"))
-  (testing "GET"
-    (testing "expansion"
-      (is (= '["/my-route" {:get {:handler (clojure.core/fn [req__#]
-                                             (clojure.core/let [identity__# (:identity req__#)
-                                                                scoped-identity identity__#]
-                                               (do clojure.core/identity)))}}]
-             (dexpand-1
-               `(sut/GET
-                  "/my-route" []
-                  :auth-identity ~'scoped-identity
-                  identity)))))
-    (testing "200 response"
-      (let [id (->ReadOnlyIdentity)
-            response (let [app (ring/ring-handler
-                                 (ring/router
-                                   (sut/GET "/my-route" []
-                                            :auth-identity scoped-identity
-                                            {:status 200
-                                             :body scoped-identity})))]
-                       (app {:request-method :get
-                             :uri "/my-route"
-                             :identity id}))]
-        (is (= {:status 200
-                :body id}
-               response))
-        (is (identical? id (:body response)))))))
 
 (deftest path-params-test
   (testing "context"

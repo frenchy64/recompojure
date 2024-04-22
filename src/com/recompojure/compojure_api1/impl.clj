@@ -18,9 +18,9 @@
     sym-or-options
     (let [sym sym-or-options]
       (assert (qualified-symbol? sym))
-      (let [v (ns-resolve sym)
+      (let [v (find-var sym)
             _ (assert (var? v))
-            options @sym]
+            options @v]
         (assert (map? options) (str "Missing options from " sym))
         (assoc options ::options-sym sym)))))
 
@@ -273,7 +273,7 @@
 
 (defn add-destructuring-for [ast path nme default]
   (assert (simple-symbol? nme))
-  (assert (nil? default))
+  (assert (nil? default) (pr-str default))
   (prn "add-destructuring-for" (compile-ast ast) path nme)
   (case (:op ast)
     :placeholder (if (empty? path)
@@ -318,7 +318,8 @@
   (assert (or (= [] arg)
               (simple-symbol? arg))
           (pr-str arg))
-  (let [[{:keys [capabilities auth-identity identity-map tags middleware] :as options} body-exprs] (extract-parameters args true)
+  (let [OPTIONS (resolve-options OPTIONS)
+        [{:keys [capabilities auth-identity identity-map tags middleware] :as options} body-exprs] (extract-parameters args true)
         _ (check-return-banned! options)
         _ (when (simple-symbol? arg)
             (prevent-scoping-difference-error! arg options))
@@ -328,7 +329,7 @@
                                                             (:extra-allowed-endpoint-options OPTIONS)))]
             (throw (ex-info (str "Not allowed these options in endpoints: "
                                  (pr-str (sort extra-keys)))
-                            {})))
+                            {:options OPTIONS})))
         responses (when-some [[_ responses] (find options :responses)]
                     `(compojure->reitit-responses ~responses))
         query-params (when-some [[_ query-params] (find options :query-params)]
@@ -415,7 +416,7 @@
                                               (-> acc
                                                   (update :ast add-destructuring-for path gnme default)
                                                   (update :inner conj (wrap gnme))))
-                                            (update acc :ast (add-destructuring-for path nme default))))))
+                                            (update acc :ast add-destructuring-for path nme default)))))
                                     {:ast {:op :placeholder :name "req"}
                                      :inner []}
                                     scoped)
