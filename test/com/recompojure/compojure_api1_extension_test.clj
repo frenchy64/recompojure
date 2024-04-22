@@ -87,9 +87,8 @@
     (testing "200 response"
       (let [id ::read-only-identity #_(->ReadOnlyIdentity)]
         (is (= {:status 200
-                :body {:login "Unknown"
-                       :groups ["Unknown Group"]
-                       :client-id nil}}
+                :body {:op 'com.recompojure.compojure-api1.impl/ident->map-stub
+                       :args [:com.recompojure.compojure-api1-extension-test/read-only-identity]}}
                (let [app (ring/ring-handler
                            (ring/router
                              (GET "/my-route" []
