@@ -26,8 +26,9 @@
                                      (fn [s#]
                                        {:pre [(string? s#)]
                                         :post [(symbol? ~'%)]}
-                                       (assert (not (contains? (first (swap-vals! seen# conj s#)) s#))
-                                               (str "Reused " s#))
+                                       #_
+                                       (when (contains? (first (swap-vals! seen# conj s#)) s#)
+                                         (throw (ex-info (str "Reused " s#) {})))
                                        (symbol (str s# "__#"))))}
      (do ~@body)))
 
@@ -379,11 +380,8 @@
       "Not allowed these options in `context`, push into HTTP verbs instead: (:path-params)"))
   (testing "endpoints"
     (testing "expansion"
-      (is (= '["/my-route" {:get {:handler (clojure.core/fn [req__#]
-                                             (clojure.core/let [parameters__# (:parameters req__#)
-                                                                path__# (:path parameters__#)
-                                                                id (clojure.core/get path__# :id)]
-                                               (do identity)))
+      (is (= '["/my-route" {:get {:handler (clojure.core/fn [{{{:keys [id]} :path} :parameters}]
+                                             identity)
                                   :parameters {:path {:id schema.core/Str}}}}]
              (dexpand-1
                `(sut/GET

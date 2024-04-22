@@ -245,8 +245,10 @@
     :else (throw (ex-info (str "Unsupported destructuring: " (pr-str d)) {:d d}))))
 
 (defn compile-ast [ast]
+  (prn ast)
   (case (:op ast)
-    :placeholder (*gensym* (or (:name ast) "_"))
+    :placeholder (*gensym* (or (:name ast)
+                               "_"))
     :local (:name ast)
     :map (let [{ks :keys :keys [as nested]} ast
                nested (update-vals nested compile-ast)]
