@@ -187,12 +187,13 @@
   "Like compojure.api.core/context, except the binding vector must be empty and
   no binding-style options are allowed. This is to prevent the passed routes
   from being reinitialized on every request."
-  [OPTIONS path arg args]
+  [?OPTIONS path arg args]
   (when-not (and (vector? arg)
                  (= [] arg))
     (throw (ex-info (str "Not allowed to bind anything in context, push into HTTP verbs instead: " (pr-str arg))
                     {})))
-  (let [[options body-exprs] (extract-parameters args true)
+  (let [OPTIONS (resolve-options ?OPTIONS)
+        [options body-exprs] (extract-parameters args true)
         _ (check-return-banned! options)
         _ (when-some [extra-keys (not-empty (set/difference (set (keys options))
                                                             allowed-context-options))]
@@ -313,12 +314,12 @@
                             nme
                             default)))))))
 
-(defn ^:private restructure-endpoint [http-kw [path arg & args] OPTIONS]
+(defn ^:private restructure-endpoint [http-kw [path arg & args] ?OPTIONS]
   (assert (simple-keyword? http-kw))
   (assert (or (= [] arg)
               (simple-symbol? arg))
           (pr-str arg))
-  (let [OPTIONS (resolve-options OPTIONS)
+  (let [OPTIONS (resolve-options ?OPTIONS)
         [{:keys [capabilities auth-identity identity-map tags middleware] :as options} body-exprs] (extract-parameters args true)
         _ (check-return-banned! options)
         _ (when (simple-symbol? arg)
@@ -502,7 +503,7 @@
 (defn undocumented
   "Routes without route-documentation. Can be used to wrap routes,
   not satisfying compojure.api.routes/Routing -protocol."
-  [options handlers]
+  [?OPTIONS handlers]
   (into ["" {:no-doc true}] handlers))
 
 (defmacro load-api [options]
