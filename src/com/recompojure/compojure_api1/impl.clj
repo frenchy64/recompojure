@@ -56,7 +56,7 @@
     [{} (seq c)]))
 
 ;;TODO make ns extensible, use these as examples
-(defn- ident->map-stub [& args] (assert nil (str "stub " `ident->map-stub)))
+(defn ident->map-stub [& args] {:op `ident->map-stub :args args})
 (defn- wrap-capabilities-stub [capabilities]
   (let [check-capabilities! (fn [{:keys [identity]}]
                               (assert nil "TODO")
@@ -245,7 +245,6 @@
     :else (throw (ex-info (str "Unsupported destructuring: " (pr-str d)) {:d d}))))
 
 (defn compile-ast [ast]
-  (prn ast)
   (case (:op ast)
     :placeholder (*gensym* (or (:name ast)
                                "_"))
@@ -277,7 +276,6 @@
 (defn add-destructuring-for [ast path nme default]
   (assert (simple-symbol? nme))
   (assert (nil? default) (pr-str default))
-  (prn "add-destructuring-for" (compile-ast ast) path nme)
   (case (:op ast)
     :placeholder (if (empty? path)
                    {:op :local :name nme}
@@ -418,7 +416,7 @@
                                             (let [gnme (*gensym* (name nme))]
                                               (-> acc
                                                   (update :ast add-destructuring-for path gnme default)
-                                                  (update :inner conj (wrap gnme))))
+                                                  (update :inner conj nme (wrap gnme))))
                                             (update acc :ast add-destructuring-for path nme default)))))
                                     {:ast {:op :placeholder :name "req"}
                                      :inner []}
@@ -426,7 +424,7 @@
         req-destructure (-> ast canonicalize-destructuring compile-ast)]
     [path {http-kw (cond-> {:handler `(fn [~req-destructure]
                                         ~@(if (seq inner)
-                                            [`(let ~scoped ~@body-exprs)]
+                                            [`(let ~inner ~@body-exprs)]
                                             (if (and (next body-exprs)
                                                      (first (map? body-exprs)))
                                               ;; don't trigger pre/post syntax

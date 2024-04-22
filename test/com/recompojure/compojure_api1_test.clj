@@ -383,7 +383,7 @@
       (is (= '["/my-route" {:get {:handler (clojure.core/fn [{{{:keys [id]} :path} :parameters}]
                                              identity)
                                   :parameters {:path {:id schema.core/Str}}}}]
-             (dexpand-1
+             (macroexpand-1
                `(sut/GET
                   "/my-route" []
                   :path-params [~'id :- s/Str]
@@ -548,54 +548,6 @@
                  (is (= {:errors {:wait_for (list 'not (list 'instance? java.lang.Boolean "1"))}
                          :type :reitit.coercion/request-coercion}
                         actual)))))))))
-
-#_ ;;TODO
-(deftest identity-map-test
-  (testing "context"
-    (is-banned-macro
-      `(sut/context
-         "/my-route" []
-         :identity-map ~'identity-map
-         ~'routes)
-      "Not allowed these options in `context`, push into HTTP verbs instead: (:identity-map)"))
-  (testing "GET"
-    (testing "expansion"
-      (is (= '["/my-route" {:get {:handler (clojure.core/fn [req__#]
-                                             (clojure.core/let [identity__# (:identity req__#)
-                                                                scoped-identity-map (ctia.auth/ident->map identity__#)]
-                                               (do clojure.core/identity)))}}]
-             (dexpand-1
-               `(sut/GET
-                  "/my-route" []
-                  :identity-map ~'scoped-identity-map
-                  identity))))
-      (testing "with auth-identity, shares :identity"
-        (is (= '["/my-route" {:get {:handler (clojure.core/fn [req__#]
-                                               (clojure.core/let [identity__# (:identity req__#)
-                                                                  scoped-identity identity__#
-                                                                  scoped-identity-map (ctia.auth/ident->map identity__#)]
-                                                 (do clojure.core/identity)))}}]
-               (dexpand-1
-                 `(sut/GET
-                    "/my-route" []
-                    :identity-map ~'scoped-identity-map
-                    :auth-identity ~'scoped-identity
-                    identity))))))
-    (testing "200 response"
-      (let [id (->ReadOnlyIdentity)]
-        (is (= {:status 200
-                :body {:login "Unknown"
-                       :groups ["Unknown Group"]
-                       :client-id nil}}
-               (let [app (ring/ring-handler
-                           (ring/router
-                             (sut/GET "/my-route" []
-                                      :identity-map scoped-identity-map
-                                      {:status 200
-                                       :body scoped-identity-map})))]
-                 (app {:request-method :get
-                       :uri "/my-route"
-                       :identity id}))))))))
 
 (deftest return-test
   (testing "context"
