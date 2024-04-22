@@ -262,9 +262,6 @@
     (:placeholder :local) ast
     :map (let [{ks :keys :keys [nested as]} ast]
            (reduce (fn [acc [k nest]]
-                     (prn "ks" ks)
-                     (prn "k" k)
-                     (prn "nest" nest)
                      ;; {a :a} => {:keys [a]}
                      (if (and (= :local (:op nest))
                               (= k (keyword (:name nest))))
@@ -273,6 +270,48 @@
                            (update :nested dissoc k))
                        ast))
                    ast nested))))
+
+(defn add-destructuring-for [ast path nme default]
+  (assert (simple-symbol? nme))
+  (assert (nil? default))
+  (prn "add-destructuring-for" (compile-ast ast) path nme)
+  (case (:op ast)
+    :placeholder (if (empty? path)
+                   {:op :local :name nme}
+                   (add-destructuring-for
+                     {:op :map}
+                     path
+                     nme
+                     default))
+    :local (if (empty? path)
+             (do (assert (= nme (:name ast)))
+                 ast)
+             (add-destructuring-for
+               {:op :map :as (:name ast)}
+               path
+               nme
+               default))
+    :map (if (empty? path)
+           (update ast :as (fn [old]
+                             (when old (assert (= old nme)
+                                               {:old old :new nme}))
+                             nme))
+           (if (next path)
+             (update-in ast [:nested (first path)]
+                        (fnil add-destructuring-for
+                              {:op :placeholder})
+                        (next path)
+                        nme
+                        default)
+             (let [k (first path)]
+               (if (= k (keyword nme))
+                 (update ast :keys (fnil conj #{}) nme)
+                 (update-in ast [:nested k]
+                            (fnil add-destructuring-for
+                                  {:op :placeholder})
+                            (next path)
+                            nme
+                            default)))))))
 
 (defn ^:private restructure-endpoint [http-kw [path arg & args] OPTIONS]
   (assert (simple-keyword? http-kw))
@@ -369,11 +408,14 @@
                            (pr-str (sort names))))))
         {:keys [ast inner]} (reduce (fn [acc {:keys [op] :as m}]
                                       (case op
-                                        :get-in-request (let [{nme :name :keys [path wrap]} m]
-                                                          (if wrap
-                                                            (let [gnme (*gensym* (name nme))]
-                                                              (add-destructuring-for ast path nme default))
-                                                            (update ast (add-destructuring-for ast path nme default))))))
+                                        :get-in-request
+                                        (let [{nme :name :keys [path wrap default]} m]
+                                          (if wrap
+                                            (let [gnme (*gensym* (name nme))]
+                                              (-> acc
+                                                  (update :ast add-destructuring-for path gnme default)
+                                                  (update :inner conj (wrap gnme))))
+                                            (update acc :ast (add-destructuring-for path nme default))))))
                                     {:ast {:op :placeholder :name "req"}
                                      :inner []}
                                     scoped)

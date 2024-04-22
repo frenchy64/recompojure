@@ -51,3 +51,21 @@
   (is (= 'a (canon 'a)))
   (is (= '{:keys [foo]} (canon '{foo :foo})))
   )
+
+(defn add-d [d path nme default]
+  (-> d
+      impl/destructuring-ast
+      impl/canonicalize-destructuring
+      (impl/add-destructuring-for path nme default)
+      impl/compile-ast))
+
+(deftest add-destructuring-for-test
+  (is (= 'foo (add-d nil [] 'foo nil)))
+  (is (= '{:as foo} (add-d {} [] 'foo nil)))
+  (is (= '{:as foo} (add-d {} [] 'foo nil)))
+  (is (thrown? AssertionError (add-d 'a [] 'foo nil)))
+  (is (= '{foo :a :as a} (add-d 'a [:a] 'foo nil)))
+  (is (= '{:keys [a] :as a} (add-d 'a [:a] 'a nil)))
+  (is (= '{{:keys [b]} :a} (add-d nil [:a :b] 'b nil)))
+  (is (= '{{:keys [b]} :a :as a} (add-d 'a [:a :b] 'b nil)))
+  )
