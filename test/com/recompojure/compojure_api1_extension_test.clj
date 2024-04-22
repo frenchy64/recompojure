@@ -14,7 +14,33 @@
             [schema.core :as s]
             [schema.utils :as su]))
 
+(defn ident->map-stub [& args] {:op `ident->map-stub :args args})
+(defn check-return-banned! [options]
+  (when-some [[_ schema] (find options :return)]
+    (throw (ex-info (format (str ":return is banned, please use :responses instead.\n"
+                                 "In this case, :return %s is equivalent to :responses {200 {:schema %s}}.\n"
+                                 "For 204, you can use :responses {204 nil}.\n"
+                                 "For catch-all, use :responses {:default {:schema SCHEMA}}")
+                            schema schema)
+                    {}))))
+
 (def ^:private options {:impl :compojure-api1
+                        :restructure-compojure
+                        {:capabilities
+                         (fn [{:keys [capabilities]} _]
+                           {:retit-map [{[:middleware]
+                                         [`(wrap-capabilities-stub ~capabilities)]}]})
+                         :return (fn [options _] (check-return-banned! options))
+                         :identity-map
+                         (fn [{:keys [identity-map]} _]
+                           (when identity-map
+                             (assert (simple-symbol? identity-map)
+                                     (str ":identity-map must be a simple symbol: "
+                                          (pr-str identity-map)))
+                             {:scoped [{:name identity-map
+                                        :op :get-in-request
+                                        :path [:identity]
+                                        :wrap #(list `ident->map-stub %)}]}))}
                         :extra-allowed-endpoint-options #{:capabilities :auth-identity :identity-map}})
 
 (impl/load-api `options)

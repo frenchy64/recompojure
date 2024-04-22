@@ -56,7 +56,6 @@
     [{} (seq c)]))
 
 ;;TODO make ns extensible, use these as examples
-(defn ident->map-stub [& args] {:op `ident->map-stub :args args})
 (defn- wrap-capabilities-stub [capabilities]
   (let [check-capabilities! (fn [{:keys [identity]}]
                               (assert nil "TODO")
