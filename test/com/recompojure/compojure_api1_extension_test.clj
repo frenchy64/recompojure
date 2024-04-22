@@ -62,10 +62,11 @@
       "Not allowed these options in `context`, push into HTTP verbs instead: (:identity-map)"))
   (testing "GET"
     (testing "expansion"
-      (is (= '["/my-route" {:get {:handler (clojure.core/fn [req__#]
-                                             (clojure.core/let [identity__# (:identity req__#)
-                                                                scoped-identity-map (ctia.auth/ident->map identity__#)]
-                                               (do clojure.core/identity)))}}]
+      (is (= '["/my-route" {:get {:handler (clojure.core/fn [{scoped-identity-map__# :identity}]
+                                             (clojure.core/let
+                                               [scoped-identity-map
+                                                (com.recompojure.compojure-api1.impl/ident->map-stub scoped-identity-map__#)]
+                                               clojure.core/identity))}}]
              (dexpand-1
                `(GET
                   "/my-route" []
